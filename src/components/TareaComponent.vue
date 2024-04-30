@@ -24,22 +24,33 @@
               </div>
             </div>
             <br />
+            <div class="text-center">
+              <div
+                v-if="loading"
+                class="spinner-border text-success"
+                role="status"
+              >
+                <span class="visually-hidden">Cargando...</span>
+              </div>
+            </div>
             <h6
               class="textDatos display-4 text-center"
               v-if="listTareas.length === 0"
             >
-
               No hay datos disponibles
             </h6>
-            
-            <ul class="list-group">
+
+            <ul v-if="!loading" class="list-group">
               <li
                 v-for="(tarea, index) of listTareas"
                 :key="index"
                 class="list-group-item d-flex justify-content-between"
               >
-                <span class="cursor" v-bind:class="{'text-success': tarea.estado}"
-                @click="editarTarea(tarea, index)">
+                <span
+                  class="cursor"
+                  v-bind:class="{ 'text-success': tarea.estado }"
+                  @click="editarTarea(tarea, tarea.id)"
+                >
                   <i
                     v-bind:class="[
                       tarea.estado
@@ -49,7 +60,10 @@
                   ></i>
                 </span>
                 {{ tarea.nombre }}
-                <span class="text-danger cursor" @click="eliminarTarea(index)">
+                <span
+                  class="text-danger cursor"
+                  @click="eliminarTarea(tarea.id)"
+                >
                   <i class="fa-solid fa-trash-can"></i>
                 </span>
               </li>
@@ -62,30 +76,107 @@
 </template>
 
 <script>
+import { deleteTarea, getTareas, postTarea, putTarea } from "@/service/actions";
+import Swal from "sweetalert2";
+
 export default {
   name: "TareaComponent",
   data() {
     return {
       tarea: "",
       listTareas: [],
+      loading: false,
     };
   },
+  created() {
+    this.obtenerListTareas();
+  },
   methods: {
-    agregarTarea() {
-      const tarea = {
-        nombre: this.tarea,
-        estado: false,
-      };
-      console.log("🚀 ~ agregarTarea ~ tarea:", tarea);
-      this.listTareas.push(tarea);
-      this.tarea = "";
+    async agregarTarea() {
+      try {
+        if (this.tarea == "") {
+          Swal.fire("Debe ingresar una tarea", "", "warning");
+        }
+        const tarea = {
+          nombre: this.tarea,
+          estado: false,
+        };
+        const res = await postTarea(tarea);
+        if (res.status === 200) {
+          Swal.fire({
+            position: "top-center",
+            icon: "success",
+            title: "La tarea ha sido agregada con éxito",
+            showConfirmButton: false,
+            timer: 1500,
+          });
+          this.obtenerListTareas();
+        }
+        this.tarea = "";
+      } catch {
+        this.loading = false;
+      }
     },
-    editarTarea(tarea, index) {
-      this.listTareas[index].estado = !tarea.estado;
+    async editarTarea(tarea, id) {
+      // this.listTareas[index].estado = !tarea.estado;
+      try {
+        const response = await putTarea(id, tarea);
+        if (response.status === 200) {
+          Swal.fire({
+            position: "top-center",
+            icon: "success",
+            title: "La tarea ha sido actualizada con éxito",
+            showConfirmButton: false,
+            timer: 1500,
+          });
+          this.obtenerListTareas();
+        }
+      } catch {
+        this.loading = false;
+      }
     },
 
-    eliminarTarea(index) {
-      this.listTareas.splice(index, 1);
+    async eliminarTarea(id) {
+      try {
+        const resp = await deleteTarea(id);
+        if (resp.status === 200) {
+          Swal.fire({
+            title: "¿Está seguro que desea eliminar la tarea?",
+            text: "",
+            icon: "warning",
+            showCancelButton: true,
+            confirmButtonColor: "#3085d6",
+            cancelButtonColor: "#d33",
+            confirmButtonText: "Si, eliminar",
+          }).then((result) => {
+            if (result.isConfirmed) {
+              Swal.fire({
+                position: "top-center",
+                icon: "success",
+                title: "La tarea ha sido eliminada con éxito",
+                showConfirmButton: false,
+                timer: 1500,
+              });
+            }
+          });
+          this.obtenerListTareas();
+        }
+      } catch {
+        this.loading = false;
+      }
+
+      //this.listTareas.splice(index, 1);
+    },
+    async obtenerListTareas() {
+      try {
+        this.loading = true;
+        const resp = await getTareas();
+        this.listTareas = resp;
+        console.log("🚀 ~ obtenerListTareas ~ resp:", resp);
+        this.loading = false;
+      } catch {
+        return [];
+      }
     },
   },
 };
